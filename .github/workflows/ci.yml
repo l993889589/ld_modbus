@@ -8,7 +8,7 @@ jobs:
   gcc:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DLD_MODBUS_BUILD_TESTS=ON
       - name: Build with warnings as errors
@@ -19,7 +19,7 @@ jobs:
   contract:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Check static-memory and portability contract
         shell: pwsh
         run: ./scripts/check_quality.ps1
