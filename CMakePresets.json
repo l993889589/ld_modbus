@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "configurePresets": [
+    {
+      "name": "mingw-debug",
+      "displayName": "MinGW host tests (Debug)",
+      "generator": "MinGW Makefiles",
+      "binaryDir": "${sourceDir}/build/mingw-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "LD_MODBUS_BUILD_TESTS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "mingw-debug",
+      "configurePreset": "mingw-debug"
+    }
+  ]
+}
+
