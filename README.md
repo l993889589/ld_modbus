@@ -121,6 +121,25 @@ if(status == LD_MODBUS_STATUS_OK && action == LD_MODBUS_SERVER_ACTION_REPLY)
 The example uses application-owned static storage. The optional LDC adapter
 packages the same flow into `ld_modbus_ldc_rtu_server_poll()`.
 
+## Application-side table access
+
+The server map also provides checked helpers for application code. These
+helpers use the configured start address, reject unmapped addresses, normalize
+bit values to `0` or `1`, and never allocate memory:
+
+```c
+uint16_t value;
+
+ld_modbus_server_map_write_holding_register(&map, 10U, 1234U);
+ld_modbus_server_map_read_holding_register(&map, 10U, &value);
+```
+
+The complete helper set covers coils, discrete inputs, holding registers, and
+input registers. Discrete inputs and input registers use local `set` helpers:
+the application may update sensor values, while those tables remain read-only
+to a remote Modbus client. The caller must provide synchronization if protocol
+processing and application updates can run concurrently.
+
 ## License
 
 Apache-2.0. Modbus is a registered trademark of Schneider Electric. This

@@ -60,6 +60,189 @@ static int ld_modbus_server_range_is_valid(uint16_t address,
     return offset + quantity <= count;
 }
 
+/** @brief Translate one configured Modbus data address into a table index. */
+static ld_modbus_status_t ld_modbus_server_map_index(uint16_t address,
+                                                     uint16_t start,
+                                                     uint16_t count,
+                                                     uint16_t *index)
+{
+    uint32_t offset;
+
+    if(index == NULL)
+        return LD_MODBUS_STATUS_INVALID_ARGUMENT;
+    if(address < start)
+        return LD_MODBUS_STATUS_RANGE_ERROR;
+    offset = (uint32_t)address - start;
+    if(offset >= count)
+        return LD_MODBUS_STATUS_RANGE_ERROR;
+    *index = (uint16_t)offset;
+    return LD_MODBUS_STATUS_OK;
+}
+
+/** @brief Read one normalized coil value through the public application map API. */
+ld_modbus_status_t ld_modbus_server_map_read_coil(const ld_modbus_server_map_t *map,
+                                                  uint16_t address,
+                                                  uint8_t *value)
+{
+    uint16_t index;
+    ld_modbus_status_t status;
+
+    if(map == NULL || value == NULL)
+        return LD_MODBUS_STATUS_INVALID_ARGUMENT;
+    if(map->coils == NULL)
+        return LD_MODBUS_STATUS_RANGE_ERROR;
+    status = ld_modbus_server_map_index(address, map->coils_start,
+                                        map->coils_count, &index);
+    if(status != LD_MODBUS_STATUS_OK)
+        return status;
+    *value = map->coils[index] != 0U ? 1U : 0U;
+    return LD_MODBUS_STATUS_OK;
+}
+
+/** @brief Write one normalized coil value through the public application map API. */
+ld_modbus_status_t ld_modbus_server_map_write_coil(ld_modbus_server_map_t *map,
+                                                   uint16_t address,
+                                                   uint8_t value)
+{
+    uint16_t index;
+    ld_modbus_status_t status;
+
+    if(map == NULL)
+        return LD_MODBUS_STATUS_INVALID_ARGUMENT;
+    if(map->coils == NULL)
+        return LD_MODBUS_STATUS_RANGE_ERROR;
+    status = ld_modbus_server_map_index(address, map->coils_start,
+                                        map->coils_count, &index);
+    if(status != LD_MODBUS_STATUS_OK)
+        return status;
+    map->coils[index] = value != 0U ? 1U : 0U;
+    return LD_MODBUS_STATUS_OK;
+}
+
+/** @brief Read one normalized discrete input through the public application map API. */
+ld_modbus_status_t ld_modbus_server_map_read_discrete_input(
+    const ld_modbus_server_map_t *map,
+    uint16_t address,
+    uint8_t *value)
+{
+    uint16_t index;
+    ld_modbus_status_t status;
+
+    if(map == NULL || value == NULL)
+        return LD_MODBUS_STATUS_INVALID_ARGUMENT;
+    if(map->discrete_inputs == NULL)
+        return LD_MODBUS_STATUS_RANGE_ERROR;
+    status = ld_modbus_server_map_index(address, map->discrete_inputs_start,
+                                        map->discrete_inputs_count, &index);
+    if(status != LD_MODBUS_STATUS_OK)
+        return status;
+    *value = map->discrete_inputs[index] != 0U ? 1U : 0U;
+    return LD_MODBUS_STATUS_OK;
+}
+
+/** @brief Update one normalized discrete input from the local application. */
+ld_modbus_status_t ld_modbus_server_map_set_discrete_input(ld_modbus_server_map_t *map,
+                                                           uint16_t address,
+                                                           uint8_t value)
+{
+    uint16_t index;
+    ld_modbus_status_t status;
+
+    if(map == NULL)
+        return LD_MODBUS_STATUS_INVALID_ARGUMENT;
+    if(map->discrete_inputs == NULL)
+        return LD_MODBUS_STATUS_RANGE_ERROR;
+    status = ld_modbus_server_map_index(address, map->discrete_inputs_start,
+                                        map->discrete_inputs_count, &index);
+    if(status != LD_MODBUS_STATUS_OK)
+        return status;
+    map->discrete_inputs[index] = value != 0U ? 1U : 0U;
+    return LD_MODBUS_STATUS_OK;
+}
+
+/** @brief Read one holding register through the public application map API. */
+ld_modbus_status_t ld_modbus_server_map_read_holding_register(
+    const ld_modbus_server_map_t *map,
+    uint16_t address,
+    uint16_t *value)
+{
+    uint16_t index;
+    ld_modbus_status_t status;
+
+    if(map == NULL || value == NULL)
+        return LD_MODBUS_STATUS_INVALID_ARGUMENT;
+    if(map->holding_registers == NULL)
+        return LD_MODBUS_STATUS_RANGE_ERROR;
+    status = ld_modbus_server_map_index(address, map->holding_registers_start,
+                                        map->holding_registers_count, &index);
+    if(status != LD_MODBUS_STATUS_OK)
+        return status;
+    *value = map->holding_registers[index];
+    return LD_MODBUS_STATUS_OK;
+}
+
+/** @brief Write one holding register through the public application map API. */
+ld_modbus_status_t ld_modbus_server_map_write_holding_register(
+    ld_modbus_server_map_t *map,
+    uint16_t address,
+    uint16_t value)
+{
+    uint16_t index;
+    ld_modbus_status_t status;
+
+    if(map == NULL)
+        return LD_MODBUS_STATUS_INVALID_ARGUMENT;
+    if(map->holding_registers == NULL)
+        return LD_MODBUS_STATUS_RANGE_ERROR;
+    status = ld_modbus_server_map_index(address, map->holding_registers_start,
+                                        map->holding_registers_count, &index);
+    if(status != LD_MODBUS_STATUS_OK)
+        return status;
+    map->holding_registers[index] = value;
+    return LD_MODBUS_STATUS_OK;
+}
+
+/** @brief Read one input register through the public application map API. */
+ld_modbus_status_t ld_modbus_server_map_read_input_register(
+    const ld_modbus_server_map_t *map,
+    uint16_t address,
+    uint16_t *value)
+{
+    uint16_t index;
+    ld_modbus_status_t status;
+
+    if(map == NULL || value == NULL)
+        return LD_MODBUS_STATUS_INVALID_ARGUMENT;
+    if(map->input_registers == NULL)
+        return LD_MODBUS_STATUS_RANGE_ERROR;
+    status = ld_modbus_server_map_index(address, map->input_registers_start,
+                                        map->input_registers_count, &index);
+    if(status != LD_MODBUS_STATUS_OK)
+        return status;
+    *value = map->input_registers[index];
+    return LD_MODBUS_STATUS_OK;
+}
+
+/** @brief Update one input register from the local application. */
+ld_modbus_status_t ld_modbus_server_map_set_input_register(ld_modbus_server_map_t *map,
+                                                           uint16_t address,
+                                                           uint16_t value)
+{
+    uint16_t index;
+    ld_modbus_status_t status;
+
+    if(map == NULL)
+        return LD_MODBUS_STATUS_INVALID_ARGUMENT;
+    if(map->input_registers == NULL)
+        return LD_MODBUS_STATUS_RANGE_ERROR;
+    status = ld_modbus_server_map_index(address, map->input_registers_start,
+                                        map->input_registers_count, &index);
+    if(status != LD_MODBUS_STATUS_OK)
+        return status;
+    map->input_registers[index] = value;
+    return LD_MODBUS_STATUS_OK;
+}
+
 /** @brief Process functions 01 and 02. */
 static ld_modbus_status_t ld_modbus_server_read_bits(const ld_modbus_server_map_t *map,
                                                      const uint8_t *request,

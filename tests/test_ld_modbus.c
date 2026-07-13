@@ -172,6 +172,71 @@ static void test_server_map(void)
     }
 }
 
+/** @brief Verify application-side accessors for all four Modbus data tables. */
+static void test_server_map_accessors(void)
+{
+    uint8_t coils[3] = {0U, 0U, 0U};
+    uint8_t discrete[2] = {0U, 0U};
+    uint16_t holding[3] = {0U, 0U, 0U};
+    uint16_t input[2] = {0U, 0U};
+    ld_modbus_server_map_t map;
+    uint8_t bit_value = 0U;
+    uint16_t register_value = 0U;
+
+    memset(&map, 0, sizeof(map));
+    map.coils = coils;
+    map.coils_start = 10U;
+    map.coils_count = 3U;
+    map.discrete_inputs = discrete;
+    map.discrete_inputs_start = 20U;
+    map.discrete_inputs_count = 2U;
+    map.holding_registers = holding;
+    map.holding_registers_start = 100U;
+    map.holding_registers_count = 3U;
+    map.input_registers = input;
+    map.input_registers_start = 200U;
+    map.input_registers_count = 2U;
+
+    assert(ld_modbus_server_map_write_coil(&map, 11U, 9U) == LD_MODBUS_STATUS_OK);
+    assert(coils[1] == 1U);
+    assert(ld_modbus_server_map_read_coil(&map, 11U, &bit_value) ==
+           LD_MODBUS_STATUS_OK);
+    assert(bit_value == 1U);
+
+    assert(ld_modbus_server_map_set_discrete_input(&map, 20U, 2U) ==
+           LD_MODBUS_STATUS_OK);
+    assert(ld_modbus_server_map_read_discrete_input(&map, 20U, &bit_value) ==
+           LD_MODBUS_STATUS_OK);
+    assert(bit_value == 1U && discrete[0] == 1U);
+
+    assert(ld_modbus_server_map_write_holding_register(&map, 102U, 0x1234U) ==
+           LD_MODBUS_STATUS_OK);
+    assert(ld_modbus_server_map_read_holding_register(&map, 102U, &register_value) ==
+           LD_MODBUS_STATUS_OK);
+    assert(register_value == 0x1234U);
+
+    assert(ld_modbus_server_map_set_input_register(&map, 201U, 0xABCDU) ==
+           LD_MODBUS_STATUS_OK);
+    assert(ld_modbus_server_map_read_input_register(&map, 201U, &register_value) ==
+           LD_MODBUS_STATUS_OK);
+    assert(register_value == 0xABCDU);
+
+    assert(ld_modbus_server_map_read_coil(NULL, 10U, &bit_value) ==
+           LD_MODBUS_STATUS_INVALID_ARGUMENT);
+    assert(ld_modbus_server_map_read_coil(&map, 10U, NULL) ==
+           LD_MODBUS_STATUS_INVALID_ARGUMENT);
+    assert(ld_modbus_server_map_read_coil(&map, 9U, &bit_value) ==
+           LD_MODBUS_STATUS_RANGE_ERROR);
+    assert(ld_modbus_server_map_write_coil(&map, 13U, 1U) ==
+           LD_MODBUS_STATUS_RANGE_ERROR);
+    assert(ld_modbus_server_map_read_holding_register(&map, 103U, &register_value) ==
+           LD_MODBUS_STATUS_RANGE_ERROR);
+
+    map.input_registers = NULL;
+    assert(ld_modbus_server_map_set_input_register(&map, 200U, 1U) ==
+           LD_MODBUS_STATUS_RANGE_ERROR);
+}
+
 /** @brief Exercise every v0.1 function code and both address/value exceptions. */
 static void test_all_function_codes(void)
 {
@@ -362,6 +427,7 @@ int main(void)
     test_in_place_codec();
     test_client_helpers();
     test_server_map();
+    test_server_map_accessors();
     test_all_function_codes();
     test_complete_adu_servers();
     puts("ld_modbus tests passed");

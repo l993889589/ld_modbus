@@ -19,7 +19,7 @@ typedef struct
     uint16_t coils_start;
     uint16_t coils_count;
 
-    const uint8_t *discrete_inputs;
+    uint8_t *discrete_inputs;
     uint16_t discrete_inputs_start;
     uint16_t discrete_inputs_count;
 
@@ -27,10 +27,105 @@ typedef struct
     uint16_t holding_registers_start;
     uint16_t holding_registers_count;
 
-    const uint16_t *input_registers;
+    uint16_t *input_registers;
     uint16_t input_registers_start;
     uint16_t input_registers_count;
 } ld_modbus_server_map_t;
+
+/**
+ * @brief Read one coil from an application-owned server map.
+ * @param map Server map initialized by the application.
+ * @param address Zero-based Modbus data address, including the configured table start.
+ * @param value Receives a normalized value of 0 or 1 on success.
+ * @return OK, INVALID_ARGUMENT for null arguments, or RANGE_ERROR when unmapped.
+ * @note The caller owns synchronization if protocol processing can access the map concurrently.
+ */
+ld_modbus_status_t ld_modbus_server_map_read_coil(const ld_modbus_server_map_t *map,
+                                                  uint16_t address,
+                                                  uint8_t *value);
+
+/**
+ * @brief Write one coil in an application-owned server map.
+ * @param map Server map initialized by the application.
+ * @param address Zero-based Modbus data address, including the configured table start.
+ * @param value Any nonzero value is stored as 1; zero is stored as 0.
+ * @return OK, INVALID_ARGUMENT for a null map, or RANGE_ERROR when unmapped.
+ */
+ld_modbus_status_t ld_modbus_server_map_write_coil(ld_modbus_server_map_t *map,
+                                                   uint16_t address,
+                                                   uint8_t value);
+
+/**
+ * @brief Read one discrete input from an application-owned server map.
+ * @param map Server map initialized by the application.
+ * @param address Zero-based Modbus data address, including the configured table start.
+ * @param value Receives a normalized value of 0 or 1 on success.
+ * @return OK, INVALID_ARGUMENT for null arguments, or RANGE_ERROR when unmapped.
+ */
+ld_modbus_status_t ld_modbus_server_map_read_discrete_input(
+    const ld_modbus_server_map_t *map,
+    uint16_t address,
+    uint8_t *value);
+
+/**
+ * @brief Update one discrete input from the local application or sensor layer.
+ * @param map Server map initialized by the application.
+ * @param address Zero-based Modbus data address, including the configured table start.
+ * @param value Any nonzero value is stored as 1; zero is stored as 0.
+ * @return OK, INVALID_ARGUMENT for a null map, or RANGE_ERROR when unmapped.
+ * @note This does not make discrete inputs writable by a remote Modbus client.
+ */
+ld_modbus_status_t ld_modbus_server_map_set_discrete_input(ld_modbus_server_map_t *map,
+                                                           uint16_t address,
+                                                           uint8_t value);
+
+/**
+ * @brief Read one holding register from an application-owned server map.
+ * @param map Server map initialized by the application.
+ * @param address Zero-based Modbus data address, including the configured table start.
+ * @param value Receives the register value on success.
+ * @return OK, INVALID_ARGUMENT for null arguments, or RANGE_ERROR when unmapped.
+ */
+ld_modbus_status_t ld_modbus_server_map_read_holding_register(
+    const ld_modbus_server_map_t *map,
+    uint16_t address,
+    uint16_t *value);
+
+/**
+ * @brief Write one holding register in an application-owned server map.
+ * @param map Server map initialized by the application.
+ * @param address Zero-based Modbus data address, including the configured table start.
+ * @param value Register value to store.
+ * @return OK, INVALID_ARGUMENT for a null map, or RANGE_ERROR when unmapped.
+ */
+ld_modbus_status_t ld_modbus_server_map_write_holding_register(
+    ld_modbus_server_map_t *map,
+    uint16_t address,
+    uint16_t value);
+
+/**
+ * @brief Read one input register from an application-owned server map.
+ * @param map Server map initialized by the application.
+ * @param address Zero-based Modbus data address, including the configured table start.
+ * @param value Receives the register value on success.
+ * @return OK, INVALID_ARGUMENT for null arguments, or RANGE_ERROR when unmapped.
+ */
+ld_modbus_status_t ld_modbus_server_map_read_input_register(
+    const ld_modbus_server_map_t *map,
+    uint16_t address,
+    uint16_t *value);
+
+/**
+ * @brief Update one input register from the local application or sensor layer.
+ * @param map Server map initialized by the application.
+ * @param address Zero-based Modbus data address, including the configured table start.
+ * @param value Register value to store.
+ * @return OK, INVALID_ARGUMENT for a null map, or RANGE_ERROR when unmapped.
+ * @note This does not make input registers writable by a remote Modbus client.
+ */
+ld_modbus_status_t ld_modbus_server_map_set_input_register(ld_modbus_server_map_t *map,
+                                                           uint16_t address,
+                                                           uint16_t value);
 
 /** @brief Observable result of processing one complete server request ADU. */
 typedef enum
