@@ -176,6 +176,8 @@ const char *ld_modbus_status_string(ld_modbus_status_t status)
     case LD_MODBUS_STATUS_EXCEPTION_RESPONSE: return "exception response";
     case LD_MODBUS_STATUS_RANGE_ERROR: return "range error";
     case LD_MODBUS_STATUS_NOT_SUPPORTED: return "not supported";
+    case LD_MODBUS_STATUS_TRANSPORT_ERROR: return "transport error";
+    case LD_MODBUS_STATUS_STORAGE_ERROR: return "storage error";
     default: return "unknown status";
     }
 }

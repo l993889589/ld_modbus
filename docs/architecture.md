@@ -1,71 +1,57 @@
 # Architecture contract
 
-## Purpose
+## 职责边界
 
-`ld_modbus` owns Modbus wire framing and protocol semantics. Its optional RTU
-framer owns the T1.5/T3.5 state machine, but it does not own UARTs, RS-485
-direction, DMA, sockets, tasks, timers, clocks, or application business logic.
+`ld_modbus` 负责 Modbus RTU/TCP 线格式、主从协议语义和 RTU 接收时序，但不拥有 UART、RS-485 DE、DMA、Socket、任务、定时器或应用业务。
 
-## Static ownership
+- 应用拥有全部静态内存；
+- UART/BSP 搬运字节，并提供字符接收完成时间戳；
+- `ld_modbus_rtu_framer` 把时间戳字节流变成完整 RTU ADU；
+- codec/client/server 只处理完整 ADU；
+- 应用负责协议上下文和寄存器表的并发保护。
 
-- The application owns every buffer and mapping array.
-- One execution context owns a mutable Modbus transaction context.
-- The transport owns byte movement and end-of-character timestamps.
-- `ld_modbus_rtu_framer` may turn timestamped bytes into strict RTU frame
-  boundaries without depending on a particular timer or UART implementation.
-- LDC may provide simpler RTU silence-based framing, but is not required by the
-  core and does not by itself enforce the T1.5 invalid-frame rule.
-- The server validates the complete address range before changing mapped data.
+LDC 不属于 `ld_modbus` 的构建、头文件或运行依赖。
 
-## Runtime model
+## RTU 双缓冲
 
-The protocol core is frame-in/frame-out and never waits. Optional synchronous
-client helpers may be built above it, while bare-metal and RTOS applications
-can use the same codec and state-machine APIs.
+接收器使用两个调用者提供的等容量缓冲区：一个写入当前流，一个保存待处理帧。发布时交换指针，不复制完整帧。
 
-## Optional strict RTU framer
+完成帧通过 `claim/release` 固定生命周期。ready 槽被占用时，新完成帧被明确丢弃并计数；生产者绝不会覆盖 claimed 数据。这个单槽背压模型适合 Modbus 一问一答，不试图复制通用多帧队列。
 
-The caller owns two static buffers and supplies each byte with its
-end-of-character timestamp. At baud rates up to 19200, T1.5 and T3.5 are
-calculated from the configured bits per character; above 19200 they are fixed
-at 750 us and 1750 us. Because completion-to-completion timestamps include the
-current character transmission time, the framer subtracts that character time
-before comparing actual bus silence.
+## 执行模型
 
-A T1.5 violation or buffer overflow invalidates the current stream. The framer
-then discards bytes until a new T3.5 silence boundary, preventing a tail
-fragment from being delivered as a fresh request. Hardware timestamp capture,
-polling cadence, DMA extraction, and RTOS synchronization remain platform
-responsibilities.
+- `on_byte()` 和 `poll()` 是同一个逻辑生产者，必须串行；
+- UART ISR 可调用 `on_byte()`；
+- UART 接收错误事件调用 `on_error()`，不得静默清除数据丢失；
+- 任务调用 `poll()` 时应短暂屏蔽该 UART 接收中断；
+- 任务 claim/release 元数据时同样短暂屏蔽；
+- claim 与 release 之间的 CRC、PDU 和业务处理不应全局关中断。
 
-## Initial function matrix
+## RTU 时序
 
-| Function | Client | Server |
-| --- | --- | --- |
-| 01 Read Coils | yes | yes |
-| 02 Read Discrete Inputs | yes | yes |
-| 03 Read Holding Registers | yes | yes |
-| 04 Read Input Registers | yes | yes |
-| 05 Write Single Coil | yes | yes |
-| 06 Write Single Register | yes | yes |
-| 0F Write Multiple Coils | yes | yes |
-| 10 Write Multiple Registers | yes | yes |
-| 16 Mask Write Register | yes | yes |
-| 17 Read/Write Multiple Registers | yes | yes |
+在不高于 19200 baud 时，根据 start/data/parity/stop 的总位数计算字符、T1.5 和 T3.5；更高波特率固定为 750 us 和 1750 us。
 
-## Complete-ADU entry points
+时间戳定义为字符接收完成时刻。相邻完成时间等于总线静默时间加当前字符时间，因此字节到达路径使用：
 
-- `ld_modbus_server_process_rtu_adu()` validates CRC, filters the unit address,
-  applies permitted broadcast writes without replying, and emits a complete
-  response frame.
-- `ld_modbus_server_process_tcp_adu()` validates MBAP framing and preserves the
-  transaction and unit identifiers in its response.
-- Both functions are bounded frame-in/frame-out operations and never wait.
+```text
+completion_delta >  char_time + T1.5  -> 非法流
+completion_delta >= char_time + T3.5  -> 旧帧完成，新帧开始
+```
 
-## Non-goals for v0.1
+T1.5 违规不会把尾部当成新帧，而是进入 discard-until-T3.5。
 
-- ASCII transport;
-- dynamic register-map discovery;
-- transport-specific connection management;
-- hidden retry threads;
-- source-level compatibility with libmodbus or nanoMODBUS.
+任务自动提交使用 `T3.5 + char_time`。额外字符窗口不是修改 Modbus 帧间隔，而是保证任何在 T3.5 前开始的字符先完成并进入 `on_byte()`，避免仅凭“尚未完成的字符不可见”而提前提交。
+
+32 位时间戳允许自然回绕，前提是所有相关间隔小于 `2^31` ticks，并且调用频率足够观察一次合法边界。反向或超过半周期的字节时间戳会作废当前流并计入 `timestamp_errors`；平台报告的接收错误计入 `rx_errors`。
+
+## DMA 能力边界
+
+一个 DMA 数据块只有一个结束时间戳时，块内 T1.5 无法被恢复。此类驱动可以交付完整 ADU，但不能宣称严格检测字符间非法间隔。严格模式需要每字节时间信息、硬件接收超时事件或等价保证。
+
+## 非目标
+
+- 动态寄存器映射发现；
+- 隐藏的重试线程；
+- UART/HAL 初始化；
+- 通用串口帧队列；
+- 与 libmodbus、nanoMODBUS 或 LDC 的源码兼容。
