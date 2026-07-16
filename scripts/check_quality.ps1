@@ -5,7 +5,12 @@ Checks the portable-core source contract before a release or CI build.
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
-$sourceFiles = Get-ChildItem -Path "$root\include", "$root\src", "$root\integrations" -Recurse -File -Include *.c, *.h
+$sourceRoots = @(
+    "$root\include"
+    "$root\src"
+    "$root\integrations"
+) | Where-Object { Test-Path -LiteralPath $_ -PathType Container }
+$sourceFiles = Get-ChildItem -Path $sourceRoots -Recurse -File -Include *.c, *.h
 $failures = [System.Collections.Generic.List[string]]::new()
 
 foreach ($file in $sourceFiles) {
